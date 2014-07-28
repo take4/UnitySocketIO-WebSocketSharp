@@ -5,6 +5,7 @@ using System.Diagnostics;
 //using System.Threading.Tasks;
 using System.Linq;
 using System.Net;
+using System.IO;
 using System.Threading;
 using SocketIOClient.Eventing;
 using SocketIOClient.Messages;
@@ -172,7 +173,12 @@ namespace SocketIOClient
 							this.wsClient.Closed += wsClient_Closed;
 							*/
 							this.wsClient = new WebSocket(
-								string.Format("{0}://{1}:{2}/socket.io/1/websocket/{3}", wsScheme, uri.Host, uri.Port, this.HandShake.SID));
+									string.Format("{0}://{1}:{2}/socket.io/1/websocket/{3}", wsScheme, uri.Host, uri.Port, this.HandShake.SID));
+							if (!string.IsNullOrEmpty(this.HandShake.route)) {
+								//this.wsClient.addCookie(new WebSocketSharp.Net.Cookie("route", this.HandShake.route));
+								WebSocketSharp.Net.Cookie route = new WebSocketSharp.Net.Cookie("route", this.HandShake.route);
+								this.wsClient.addCookie(route);
+							}
 							this.wsClient.OnOpen += this.wsClient_OpenEvent;
 							this.wsClient.OnMessage += this.wsClient_MessageReceived;
 							this.wsClient.OnError += this.wsClient_Error;
@@ -619,16 +625,27 @@ namespace SocketIOClient
 			string value = string.Empty;
 			string errorText = string.Empty;
 			SocketIOHandshake handshake = null;
+			string route = string.Empty;
 
-			using (WebClient client = new WebClient())
-			{ 
 				try
 				{
 					ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => {
 						return true;
 					};
+					HttpWebRequest req = (HttpWebRequest)WebRequest.Create (string.Format("{0}://{1}:{2}/socket.io/1/{3}", uri.Scheme, uri.Host, uri.Port, uri.Query));
+					req.CookieContainer = new CookieContainer ();
+					WebResponse res = req.GetResponse ();
+					
+					Stream st = res.GetResponseStream ();
+					StreamReader sr = new StreamReader (st);
+					value = sr.ReadToEnd ();
+					sr.Close ();
 
-					value = client.DownloadString(string.Format("{0}://{1}:{2}/socket.io/1/{3}", uri.Scheme, uri.Host, uri.Port, uri.Query)); // #5 tkiley: The uri.Query is available in socket.io's handshakeData object during authorization
+					CookieCollection cookies = req.CookieContainer.GetCookies (req.RequestUri);
+					if (cookies["route"] != null) {
+						route = cookies["route"].Value.ToString();
+					}
+
 					// 13052140081337757257:15:25:websocket,htmlfile,xhr-polling,jsonp-polling
 					if (string.IsNullOrEmpty(value))
 						errorText = "Did not receive handshake string from server";
@@ -638,13 +655,17 @@ namespace SocketIOClient
 					errorText = string.Format("Error getting handsake from Socket.IO host instance: {0}", ex.Message);
 					//this.OnErrorEvent(this, new ErrorEventArgs(errMsg));
 				}
-			}
+
 			if (string.IsNullOrEmpty(errorText))
 				handshake = SocketIOHandshake.LoadFromString(value);
 			else
 			{
 				handshake = new SocketIOHandshake();
 				handshake.ErrorMessage = errorText;
+			}
+
+			if (!string.IsNullOrEmpty(route)) {
+				handshake.route = route;
 			}
 
 			return handshake;

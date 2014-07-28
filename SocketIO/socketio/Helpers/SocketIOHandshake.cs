@@ -10,6 +10,7 @@ namespace SocketIOClient
         public string SID { get; set; }
         public int HeartbeatTimeout { get; set; }
 		public string ErrorMessage { get; set; }
+		public string route { get; set; }
 		public bool HadError
 		{
 			get { return !string.IsNullOrEmpty(this.ErrorMessage); }
