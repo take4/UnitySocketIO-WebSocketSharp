@@ -136,6 +136,7 @@ namespace SocketIOClient
 			this.outboundQueue =  (new Queue<string>());
 			this.dequeuOutBoundMsgTask = new Thread(new ThreadStart(dequeuOutboundMessages));
 			//this.dequeuOutBoundMsgTask = Task.Factory.StartNew(() => dequeuOutboundMessages(), TaskCreationOptions.LongRunning);
+			this.dequeuOutBoundMsgTask.IsBackground = true;
 			this.dequeuOutBoundMsgTask.Start();
 		}
 
